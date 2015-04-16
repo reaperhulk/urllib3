@@ -50,6 +50,7 @@ try:
 except SyntaxError as e:
     raise ImportError(e)
 
+import OpenSSL.crypto
 import OpenSSL.SSL
 from pyasn1.codec.der import decoder as der_decoder
 from pyasn1.type import univ, constraint
@@ -251,13 +252,17 @@ def _verify_callback(cnx, x509, err_no, err_depth, return_code):
 
 def ssl_wrap_socket(sock, keyfile=None, certfile=None, cert_reqs=None,
                     ca_certs=None, server_hostname=None,
-                    ssl_version=None):
+                    ssl_version=None, key_passphrase=None):
     ctx = OpenSSL.SSL.Context(_openssl_versions[ssl_version])
     if certfile:
         keyfile = keyfile or certfile  # Match behaviour of the normal python ssl library
         ctx.use_certificate_file(certfile)
     if keyfile:
-        ctx.use_privatekey_file(keyfile)
+        with open(keyfile, "rb") as f:
+            keydata = f.read()
+
+        key = OpenSSL.crypto.load_privatekey(keydata, key_passphrase)
+        ctx.use_privatekey(key)
     if cert_reqs != ssl.CERT_NONE:
         ctx.set_verify(_openssl_verify[cert_reqs], _verify_callback)
     if ca_certs:
